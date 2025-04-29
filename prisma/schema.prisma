@@ -14,19 +14,103 @@ datasource db {
 }
 
 model User {
-  id               Int      @id @default(autoincrement())
+  id               Int        @id @default(autoincrement())
   name             String
-  email            String   @unique
+  email            String     @unique
   password         String
-  role             Role     @default(designer)
-  verified         Boolean  @default(false)
+  image            String?
+  imagePublicId    String?
+  position         String?
+  role             Role       @default(designer)
+  verified         Boolean    @default(false)
+  isAdmin          Boolean    @default(false)
   verificationCode String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  projects         Project[]
+  rooms            Room[]
+  comments         Comments[]
+  likes            Like[]
+  isOnline         Boolean    @default(false)
+  lastSeen         DateTime   @default(now())
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 }
 
 enum Role {
   designer
   client
-  admin
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  title       String
+  description String
+  field       String
+  images      ProjectImages[]
+  comments    Comments[]
+  likes       Like[]
+  userId      Int
+  user        User            @relation(fields: [userId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model ProjectImages {
+  publicId  String   @id
+  url       String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Chat {
+  id          String      @id @default(cuid())
+  message     String
+  roomId      String
+  userId      Int
+  delivered   Boolean     @default(false)
+  read        Boolean     @default(false)
+  room        Room        @relation(fields: [roomId], references: [id])
+  media       ChatMedia[]
+  dateCreated DateTime    @default(now())
+  dateUpdated DateTime    @updatedAt
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  chats       Chat[]
+  users       User[]
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime @updatedAt
+}
+
+model ChatMedia {
+  publicId  String   @id
+  url       String
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comments {
+  id        String   @id @default(cuid())
+  userId    Int
+  text      String
+  user      User     @relation(fields: [userId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Like {
+  id        String  @id @default(uuid())
+  userId    Int
+  projectId String
+  user      User    @relation(fields: [userId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId]) // Ensure one like per user per project
 }

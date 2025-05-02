@@ -49,25 +49,27 @@ io.on("connection", (socket) => {
     }
   });
   // sendMessageWithMedia
-  socket.on("sendMessageWithMedia", async ({ roomId, message, name, userId },callback) => {
-    const created = await prisma.chat.create({
-      data: {
-        roomId,
-        userId: parseInt(userId),
-        message,
-      },
-    });
-    if (created) {
-      io.to(name).emit("newMessage", message);
-      io.to(name).emit("refresh", new Date());
-      callback({chatId:created.id})
+  socket.on(
+    "sendMessageWithMedia",
+    async ({ roomId, message, name, userId }, callback) => {
+      const created = await prisma.chat.create({
+        data: {
+          roomId,
+          userId: parseInt(userId),
+          message,
+        },
+      });
+      if (created) {
+        io.to(name).emit("newMessage", message);
+        io.to(name).emit("refresh", new Date());
+        callback({ chatId: created.id });
+      }
     }
-    
-  });
+  );
   // refreshMedia
-  socket.on("refreshMedia",({roomName})=>{
+  socket.on("refreshMedia", ({ roomName }) => {
     io.to(roomName).emit("refresh", new Date());
-  })
+  });
   // join all rooma
   socket.on("allRooms", async ({ id }) => {
     const user = await prisma.user.findUnique({
@@ -78,7 +80,7 @@ io.on("connection", (socket) => {
         rooms: {
           select: {
             name: true,
-            id:true
+            id: true,
           },
         },
       },
@@ -120,6 +122,11 @@ io.on("connection", (socket) => {
   socket.on("typing", ({ roomName, userId }) => {
     // send to everyone in the room except the sender
     socket.to(roomName).emit("userTyping", { userId });
+  });
+  // notification
+  socket.on("notification", ({ roomName }) => {
+    // send to everyone in the room except the sender
+    io.to(roomName).emit("refreshNotification", { roomName });
   });
   //online user
   socket.on("online", async ({ userId }) => {
@@ -167,7 +174,7 @@ io.on("connection", (socket) => {
               where: {
                 read: false,
                 NOT: {
-                  userId:Number(userId),
+                  userId: Number(userId),
                 },
               },
               data: {
@@ -194,7 +201,7 @@ io.on("connection", (socket) => {
         rooms: {
           select: {
             name: true,
-            id:true
+            id: true,
           },
         },
       },
@@ -230,6 +237,26 @@ io.on("connection", (socket) => {
         }
       });
     }
+  });
+  socket.on("disconnect", async () => {
+    const userId = socket.handshake.query?.userId;
+    if (userId) {
+      try {
+        await prisma.user.update({
+          where: {
+            id: parseInt(userId),
+          },
+          data: {
+            isOnline: false,
+            lastSeen: new Date(),
+          },
+        });
+        socket.broadcast.emit("userOffline", { userId });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    console.log("disconnected", userId);
   });
 });
 

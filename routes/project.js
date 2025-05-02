@@ -20,6 +20,7 @@ projectRouter
                 name: true,
                 email: true,
                 id: true,
+                isOnline:true
               },
             },
           },
@@ -45,6 +46,7 @@ projectRouter
                 name: true,
                 position: true,
                 image: true,
+                email:true,
               },
             },
             images: {
@@ -68,7 +70,8 @@ projectRouter
             },
             _count:{
               select:{
-                likes:true
+                likes:true,
+                views:true
               }
             },
             likes:{
@@ -154,6 +157,31 @@ projectRouter
     } catch (err) {
       console.error(err);
       res.json({ msg: "error deleting like" });
+    }
+  }).post("/project/view", async (req, res) => {
+    const { userId, projectId } = req.body;
+  
+    try {
+      await prisma.projectView.upsert({
+        where: {
+          userId_projectId: {
+            userId:parseInt(userId),
+            projectId,
+          },
+        },
+        update: {
+          viewedAt: new Date(), // update timestamp if needed
+        },
+        create: {
+          userId:parseInt(userId),
+          projectId,
+        },
+      });
+  
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Failed to track view" });
     }
   });
 

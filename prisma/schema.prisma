@@ -14,25 +14,27 @@ datasource db {
 }
 
 model User {
-  id               Int        @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   name             String
-  email            String     @unique
+  email            String         @unique
   password         String
   image            String?
   imagePublicId    String?
   position         String?
-  role             Role       @default(designer)
-  verified         Boolean    @default(false)
-  isAdmin          Boolean    @default(false)
+  role             Role           @default(designer)
+  verified         Boolean        @default(false)
+  isAdmin          Boolean        @default(false)
   verificationCode String?
   projects         Project[]
   rooms            Room[]
   comments         Comments[]
   likes            Like[]
-  isOnline         Boolean    @default(false)
-  lastSeen         DateTime   @default(now())
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  isOnline         Boolean        @default(false)
+  lastSeen         DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  Notification     Notification[]
+  projectViewed      ProjectView[]
 }
 
 enum Role {
@@ -41,17 +43,19 @@ enum Role {
 }
 
 model Project {
-  id          String          @id @default(cuid())
-  title       String
-  description String
-  field       String
-  images      ProjectImages[]
-  comments    Comments[]
-  likes       Like[]
-  userId      Int
-  user        User            @relation(fields: [userId], references: [id])
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id           String          @id @default(cuid())
+  title        String
+  description  String
+  field        String
+  images       ProjectImages[]
+  comments     Comments[]
+  likes        Like[]
+  userId       Int
+  user         User            @relation(fields: [userId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  Notification Notification[]
+  views  ProjectView[]
 }
 
 model ProjectImages {
@@ -113,4 +117,26 @@ model Like {
   project   Project @relation(fields: [projectId], references: [id])
 
   @@unique([userId, projectId]) // Ensure one like per user per project
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    Int
+  projectId String
+  type      String
+  read      Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+  project   Project  @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ProjectView {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  viewedAt  DateTime @default(now())
+
+  @@unique([userId, projectId]) // ensures one view per user per project
 }

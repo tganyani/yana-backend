@@ -32,18 +32,17 @@ userRouter
             role: true,
             imagePublicId: true,
             position: true,
-            projects:{
-              include:{
-                images:{
-                  select:{
-                    projectId:true,
-                    url:true
-                  }
-                }
-              }
-            }
+            projects: {
+              include: {
+                images: {
+                  select: {
+                    projectId: true,
+                    url: true,
+                  },
+                },
+              },
+            },
           },
-      
         })
       );
     } catch (error) {
@@ -51,11 +50,112 @@ userRouter
       console.error(error);
     }
   })
+  .get("/user-likeprojects/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      res.json(
+        await prisma.user.findUnique({
+          where: {
+            id: parseInt(id),
+          },
+          select: {
+            name: true,
+            email: true,
+            image: true,
+            createdAt: true,
+            role: true,
+            position: true,
+            likes: {
+              include: {
+                project: {
+                  select: {
+                    id: true,
+                    field: true,
+                    images: {
+                      orderBy: {
+                        createdAt: "desc",
+                      },
+                      take: 1,
+                      select: {
+                        url: true,
+                      },
+                    },
+                    user: {
+                      select: {
+                        name: true,
+                        image: true,
+                        email: true,
+                        position: true,
+                        id: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        })
+      );
+    } catch (error) {
+      res.json({ msg: "error fetching the data" });
+      console.error(error);
+    }
+  })
+  .get("/notification", async (req, res) => {
+    const userId = req.query.userId;
+    try {
+      res.json(
+        await prisma.notification.findMany({
+          where: {
+            userId: parseInt(userId),
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          select: {
+            id: true,
+            read: true,
+            type: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                image: true,
+                name: true,
+              },
+            },
+            project: {
+              select: {
+                id: true,
+                images: {
+                  take: 1,
+                  select: {
+                    url: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      );
+    } catch (err) {
+      console.error(err);
+      res.json({ msg: "error creating notification" });
+    }
+  })
   .post("/user", async (req, res) => {
     try {
       const { email, password, name } = req.body;
-
-      const existingUser = await prisma.user.findUnique({ where: { email } });
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          AND: [{ email: { equals: email } }, { verified: { equals: true } }],
+        },
+      });
+      const existingUnverifiedUser = await prisma.user.findFirst({
+        where: {
+          AND: [{ email: { equals: email } }, { verified: { equals: false } }],
+        },
+      });
       if (existingUser)
         return res.status(400).json({ error: "Email already registered" });
 
@@ -65,6 +165,14 @@ userRouter
         type: "string",
       });
       const hashedVerificationCode = await bcrypt.hash(verificationCode, 10);
+      if (existingUnverifiedUser) {
+        await sendVerificationEmail(email, verificationCode);
+        return res.json({
+          message: "Verification code sent to email",
+          created: true,
+          email,
+        });
+      }
       const user = await prisma.user.create({
         data: {
           email,
@@ -75,7 +183,7 @@ userRouter
       });
 
       await sendVerificationEmail(email, verificationCode);
-      res.json({
+      return res.json({
         message: "Verification code sent to email",
         created: true,
         email,
@@ -303,22 +411,55 @@ userRouter
   .get("/cloudinary-signature", (req, res) => {
     try {
       const timestamp = Math.floor(Date.now() / 1000);
-    const paramsToSign = `timestamp=${timestamp}&upload_preset=yana-app2`; // Optional: add public_id if custom
+      const paramsToSign = `timestamp=${timestamp}&upload_preset=yana-app2`; // Optional: add public_id if custom
 
-    const signature = crypto
-      .createHash("sha1")
-      .update(paramsToSign + process.env.CLOUDINARY_API_SECRET)
-      .digest("hex");
+      const signature = crypto
+        .createHash("sha1")
+        .update(paramsToSign + process.env.CLOUDINARY_API_SECRET)
+        .digest("hex");
 
-    res.json({
-      timestamp,
-      signature,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      upload_preset: "yana-app2",
-    });
+      res.json({
+        timestamp,
+        signature,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        upload_preset: "yana-app2",
+      });
     } catch (error) {
-      console.error(error)
-      res.json(null)
+      console.error(error);
+      res.json(null);
+    }
+  })
+  .post("/user/notification", async (req, res) => {
+    const data = req.body;
+    try {
+      const created = await prisma.notification.create({
+        data: {
+          ...data,
+          userId: Number(data.userId),
+        },
+      });
+      res.json({ notificationId: created.id });
+    } catch (err) {
+      console.error(err);
+      res.json({ msg: "error creating notification" });
+    }
+  })
+  .patch("/user/notification/:id", async (req, res) => {
+    const { id } = req.params;
+    console.log(id);
+    try {
+      const updated = await prisma.notification.update({
+        where: {
+          id,
+        },
+        data: {
+          read: true,
+        },
+      });
+      res.json({ notificationId: updated.id });
+    } catch (err) {
+      console.error(err);
+      res.json({ msg: "error updating notification" });
     }
   });
 
